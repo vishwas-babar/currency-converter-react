@@ -1,114 +1,54 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
-import CurrencyDiv from './Components';
-
-let initialOptions = Array();
-axios.get('https://open.er-api.com/v6/latest/INR')
-  .then((res) => {
-    const keys = Object.keys(res.data.rates);
-
-    keys.map((key) => {
-      initialOptions.push({ value: key, label: key });
-    })
-
-  })
+import { InputBox } from './components/index.js';
+import useCurrencyInfo from './hooks/useCurrencyInfo.js';
 
 
 let Currencyrates;
-let fromCurrency;
-let toCurrency;
 
 function App() {
 
+  const [label, setLabel] = useState('FORM');
+  const [amount, setAmount] = useState(0);
+  const [resultAmount, setResultAmount] = useState(0);
   const [options, setOptions] = useState(Array());
-  const [result, setResult] = useState(0);
+  const [fromCurrencyType, setFromCurrencyType] = useState('INR');
+  const [toCurrencyType, setToCurrencyType] = useState('USD');
 
-  const fromInputRef = useRef();
-  const toInputRef = useRef();
+  useEffect(() => {
 
-  // custome style for select components
-  const customStyles = {
-    option: (provided, state) => ({
-      ...provided,
-      backgroundColor: state.isSelected ? 'white' : 'rgba(255, 239, 247, 0.5)',
-      color: 'black',
-    }),
-    control: (provided) => ({
-      ...provided,
-      backgroundColor: 'white',
-    }),
-    menu: (provided) => ({
-      ...provided,
-      backgroundColor: 'rgba(255, 239, 247, 0.5)',
-      color: 'black',
+  }, [fromCurrencyType, toCurrencyType])
 
-    }),
-    singleValue: (provided) => ({
-      ...provided,
-      color: 'black',
-    }),
-    input: (provided) => ({
-      ...provided,
-      color: 'grey',
-      minWidth: '50px',
-      maxWidth: '50px',
-    }),
-  };
+  Currencyrates = useCurrencyInfo(fromCurrencyType).rates;
 
   useEffect(() => {
     axios.get('https://open.er-api.com/v6/latest/INR')
       .then((res) => {
         const keys = Object.keys(res.data.rates);
-
-        let optionsCopy;
-        optionsCopy = options;
-        keys.map((key) => {
-          optionsCopy.push({ value: key, label: key });
-          setOptions(optionsCopy);
-        })
-
+        setOptions(keys);
       })
       .catch((err) => {
         console.log('error occured: ', err);
       })
   }, [])
 
-  function handleOnchangeSelectOptionForFrom(event) {
-    fromCurrency = event.value;
-
-    axios.get(`https://open.er-api.com/v6/latest/${event.value}`)
-    .then( (res) => {
-      Currencyrates = res.data.rates;
-      calculateCurrency();
-    })
-    .catch((error) => {
-      alert('failed to fetch currency data from api');
-      Currencyrates = null;
-      fromCurrency = null;
-    })
-  };
-
-  function handleOnchangeSelectOptionForTo(event) {
-  
-    toCurrency = event.value;
-    calculateCurrency();
-  }
 
   function calculateCurrency() {
-    if (!Currencyrates || !fromCurrency || !toCurrency) {
-      return;
-    }
 
-    let fromInputValue = fromInputRef.current.value;
-    let toCurrencyValue = Currencyrates[toCurrency];
+    console.log('called calculatecurrnecy()')
+    console.log(Currencyrates)
 
-    let resultCopy = Number(fromInputValue)*toCurrencyValue;
+    let toSingleCurrencyValue = Currencyrates[toCurrencyType];
+    console.log(toSingleCurrencyValue);
 
-    setResult(resultCopy.toFixed(2));
+    let resultCopy = Number(amount) * toSingleCurrencyValue;
+    console.log(resultCopy);
+
+    setResultAmount(resultCopy.toFixed(2));
   }
 
-  function fromInputOnChange() {
-    calculateCurrency();
+  function fromInputOnChange(event) {
+    setAmount(Number(event.target.value));
   }
 
   return (
@@ -125,15 +65,43 @@ function App() {
 
             <div className='w-full flex flex-col gap-4 relative'>
 
-              <CurrencyDiv ref={fromInputRef} onchange={fromInputOnChange} options={options} from="From" onclick={handleOnchangeSelectOptionForFrom} customStyles={customStyles} />
+              <InputBox
+                onInputChange={fromInputOnChange}
+                onSelectChange={(event) => {
+                  console.log('getting called select change listener')
+                  setFromCurrencyType(event.target.value);
+                }}
+                fromCurrencyType={fromCurrencyType}
+                options={options}
+                label="From"
+                amount={amount}
+                currencyOptions={options}
+                from="From" />
 
-              {/* <button role='button' className='bg-blue-500 text-white absolute left-1/2 top-1/2 translate-x-[-50%] translate-y-[-50%] px-3 py-1 rounded-md outline-2 border border-spacing-8 border-white '>SWAP</button> */}
+              <button
+                role='button'
+                className='bg-blue-500 text-white absolute left-1/2 top-1/2 translate-x-[-50%] translate-y-[-50%] px-3 py-1 rounded-md outline-2 border border-spacing-8 border-white '
+                onClick={() => {
+                    setAmount(resultAmount);
+                    setResultAmount(amount);
+                }}
+              >SWAP</button>
 
-              <CurrencyDiv ref={toInputRef} result={result} options={options} from="To" onclick={handleOnchangeSelectOptionForTo} customStyles={customStyles} />
+              <InputBox
+                onSelectChange={(event) => {
+                  console.log(event)
+                  setToCurrencyType(event.target.value)
+                }}
+                toCurrencyType={toCurrencyType}
+                options={options} label="To"
+                currencyOptions={options}
+                amount={resultAmount}
+                DisabledInput={true}
+                from="To" />
 
             </div>
 
-            <button onClick={() => calculateCurrency()} className='w-full bg-green-500 text-white rounded-md py-2 mt-5 transition-all duration-300 ease-in-out hover:scale-105 hover:shadow-md active:bg-green-600'>Convert USD to INR</button>
+            <button onClick={() => calculateCurrency()} className='w-full bg-green-500 text-white rounded-md py-2 mt-5 transition-all duration-300 ease-in-out hover:scale-105 hover:shadow-md active:bg-green-600'>Convert {fromCurrencyType} to {toCurrencyType}</button>
           </div>
         </div>
       </div>
